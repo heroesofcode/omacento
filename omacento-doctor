@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+#
+# Omacento — say, per layer, whether press-and-hold accents can actually work.
+#
+# Several independent things have to be true at once, and when one is wrong the
+# symptom is always the same ("holding a does nothing useful"), so guessing is
+# expensive. This names the layer instead.
+
+set -uo pipefail
+
+HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PREFIX="${OMACENTO_PREFIX:-$HOME/.local}"
+SO="$PREFIX/lib/fcitx5/libomacento.so"
+ADDON_CONF="$PREFIX/share/fcitx5/addon/omacento.conf"
+USER_CONF="$HOME/.config/fcitx5/conf/omacento.conf"
+DROPIN="$HOME/.config/systemd/user/omarchy-fcitx5.service.d/10-omacento-addon.conf"
+
+ok()    { printf '  \033[32m✓\033[0m %s\n' "$1"; }
+bad()   { printf '  \033[31m✗\033[0m %s\n' "$1"; FAIL=1; }
+warn()  { printf '  \033[33m!\033[0m %s\n' "$1"; }
+head_() { printf '\n\033[1m%s\033[0m\n' "$1"; }
+FAIL=0
+
+head_ "fcitx5"
+if pgrep -x fcitx5 >/dev/null; then
+  ok "running ($(pacman -Q fcitx5 2>/dev/null | awk '{print $2}'))"
+else
+  bad "not running — nothing below can work. Try: systemctl --user start omarchy-fcitx5"
+  exit 1
+fi
+N=$(pgrep -c -x fcitx5)
+if [ "$N" = "1" ]; then
+  ok "exactly one instance"
+else
+  bad "$N instances running — they fight over the bus name. Check ~/.config/autostart/org.fcitx.Fcitx5.desktop still has Hidden=true"
+fi
+
+head_ "addon"
+WANT="$(pkg-config --modversion Fcitx5Core 2>/dev/null)"
+if [ -z "$WANT" ]; then
+  warn "fcitx5 headers missing, cannot rebuild if needed (pacman -S fcitx5)"
+fi
+if ! command -v g++ >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
+  bad "no C++ compiler — the addon cannot be built. Run: sudo pacman -S --needed base-devel"
+fi
+if [ -f "$SO" ]; then
+  ok "built: $SO"
+else
+  bad "not built. Run: $HERE/omacento-build"
+fi
+GOT="$( [ -f "$ADDON_CONF" ] && sed -n 's/^Version=//p' "$ADDON_CONF" | head -1 )"
+if [ -n "$WANT" ] && [ "$GOT" = "$WANT" ]; then
+  ok "built against the running fcitx5 ($WANT)"
+elif [ -n "$GOT" ]; then
+  bad "built for fcitx5 $GOT but $WANT is running — fcitx5 will refuse it. Run: $HERE/omacento-build --force"
+fi
+
+# fcitx5 only searches /usr/lib/fcitx5 by default, and FCITX_ADDON_DIRS replaces
+# that list rather than extending it.
+if [ -f "$DROPIN" ]; then
+  DIRS=$(systemctl --user show omarchy-fcitx5.service -p Environment --value 2>/dev/null | tr ' ' '\n' | sed -n 's/^FCITX_ADDON_DIRS=//p')
+  case "$DIRS" in
+    *"$PREFIX/lib/fcitx5"*) ;;
+    *) bad "FCITX_ADDON_DIRS does not include $PREFIX/lib/fcitx5" ;;
+  esac
+  case "$DIRS" in
+    *"/usr/lib/fcitx5"*) ok "addon search path covers both user and system dirs" ;;
+    *) bad "FCITX_ADDON_DIRS is missing /usr/lib/fcitx5 — xim, wayland and classicui will not load" ;;
+  esac
+else
+  bad "no systemd drop-in at $DROPIN. Run the panel once, or: $HERE/omacento-apply"
+fi
+
+# Ask the running process, not the journal. A log line only proves some fcitx5
+# loaded it at some point; this proves the one handling your keys has it.
+if busctl --user call org.fcitx.Fcitx5 /controller \
+   org.fcitx.Fcitx.Controller1 GetConfig s "fcitx://config/addon/omacento" \
+   >/dev/null 2>&1; then
+  ok "the running fcitx5 has the addon loaded"
+else
+  bad "the running fcitx5 has not loaded the addon. Run: systemctl --user restart omarchy-fcitx5"
+fi
+
+head_ "settings"
+if [ -f "$USER_CONF" ]; then
+  HOLD=$(sed -n 's/^HoldTime=//p' "$USER_CONF" | head -1)
+  EN=$(sed -n 's/^Enabled=//p' "$USER_CONF" | head -1)
+  ok "hold ${HOLD:-250}ms, enabled=${EN:-True}"
+  [ "${EN:-True}" = "False" ] && warn "the popup is switched off in the panel"
+  BLOCKED=$(sed -n '/^\[Blocklist\]/,$p' "$USER_CONF" | sed -n 's/^[0-9]*=//p' | paste -sd' ')
+  [ -n "$BLOCKED" ] && ok "off in: $BLOCKED"
+else
+  warn "no $USER_CONF yet — the addon is using its built-in defaults"
+fi
+
+head_ "appearance"
+CUI="$HOME/.config/fcitx5/conf/classicui.conf"
+if [ -f "$CUI" ]; then
+  ok "$(sed -n 's/^Theme=/theme /p;s/^Font=/font /p' "$CUI" | paste -sd', ')"
+else
+  warn "no classicui.conf — the popup will use fcitx5's stock look"
+fi
+
+head_ "leftovers from the configuration-based version"
+STALE=0
+if [ -f "$HOME/.config/hypr/omacento.lua" ]; then
+  bad "~/.config/hypr/omacento.lua still exists — it pins repeat_delay and kills repeat on fcitx5's virtual keyboard. Delete it."
+  STALE=1
+fi
+if grep -qs "omacento:begin" "$HOME/.config/hypr/hyprland.lua"; then
+  bad "hyprland.lua still has the omacento block. Remove the marked block."
+  STALE=1
+fi
+if [ -f "$HOME/.config/fcitx5/conf/keyboard.conf" ] && grep -qs "^EnableLongPress=True" "$HOME/.config/fcitx5/conf/keyboard.conf"; then
+  bad "fcitx5's own long press is still on — it will fire alongside the addon. Set EnableLongPress=False."
+  STALE=1
+fi
+[ "$STALE" = "0" ] && ok "none"
+
+printf '\n'
+[ "$FAIL" = "0" ] && printf '\033[32mall good\033[0m\n' || printf '\033[31msomething above needs fixing\033[0m\n'
+exit "$FAIL"

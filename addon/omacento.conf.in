@@ -1,0 +1,12 @@
+[Addon]
+Name=Omacento
+Comment=Press-and-hold accent picker
+Type=SharedLibrary
+Library=libomacento
+Category=Module
+Version=@FCITX_VERSION@
+OnDemand=False
+Configurable=True
+
+[Addon/Dependencies]
+0=core:@FCITX_VERSION@

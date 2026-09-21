@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.heroesofcode.omacento",
+  "name": "Omacento",
+  "version": "2.0.0",
+  "author": "heroesofcode",
+  "license": "MIT",
+  "description": "macOS-style press-and-hold accents for Hyprland. Hold a vowel, a popup opens at the cursor with every accented form, and a digit or arrow picks one. Ships a small fcitx5 addon with its own timer, so the hold time is a real setting and key repeat is left alone. Ordered for Portuguese, themed to match Omarchy.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Omacento",
+    "description": "Press-and-hold accent picker: tune the hold time, the popup's looks, and which applications it stays out of.",
+    "category": "Input",
+    "aliases": [
+      "accent",
+      "accents",
+      "acento",
+      "acentos",
+      "diacritic",
+      "longpress",
+      "long press",
+      "keyboard",
+      "teclado",
+      "portuguese",
+      "fcitx",
+      "fcitx5",
+      "macbook"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "enabled": true,
+      "holdTime": 250,
+      "vertical": false,
+      "fontSize": 14,
+      "font": "",
+      "themeSync": true,
+      "blocklist": []
+    },
+    "schema": [
+      {
+        "key": "enabled",
+        "type": "boolean",
+        "label": "Accents enabled",
+        "defaultValue": true,
+        "description": "Turn the long-press popup off without undoing any of the setup. Right-clicking the bar icon toggles this too."
+      },
+      {
+        "key": "holdTime",
+        "type": "integer",
+        "label": "Hold before the popup (ms)",
+        "defaultValue": 250,
+        "minimum": 100,
+        "maximum": 1000,
+        "description": "How long to hold a key before the accents appear. This is the addon's own timer and has nothing to do with your keyboard repeat settings. macOS sits near 500."
+      },
+      {
+        "key": "vertical",
+        "type": "boolean",
+        "label": "Stack candidates vertically",
+        "defaultValue": false,
+        "description": "One accent per row instead of a single horizontal line."
+      },
+      {
+        "key": "fontSize",
+        "type": "integer",
+        "label": "Popup text size",
+        "defaultValue": 14,
+        "minimum": 10,
+        "maximum": 28,
+        "description": "Point size for the candidates. fcitx5's stock 10 is small next to a terminal at the same nominal size."
+      },
+      {
+        "key": "font",
+        "type": "string",
+        "label": "Popup font family",
+        "defaultValue": "",
+        "description": "Leave empty to inherit the family from your terminal, so the accents match the text they replace."
+      },
+      {
+        "key": "themeSync",
+        "type": "boolean",
+        "label": "Follow the Omarchy theme",
+        "defaultValue": true,
+        "description": "Regenerate the fcitx5 popup theme from the current Omarchy palette whenever the theme or font changes. Turn off to keep a hand-edited theme."
+      },
+      {
+        "key": "blocklist",
+        "type": "list",
+        "label": "Turned off in",
+        "defaultValue": [],
+        "description": "Window classes where holding a key should repeat it instead of opening the popup \u2014 a game, or an application whose own key repeat fights the picker. Matched against the window class ('brave-browser'), not the process name ('brave')."
+      }
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# Emit the currently open applications as MultiSelect options, for the panel's
+# blocklist picker.
+#
+# The value is the Hyprland window class, because that is what fcitx5 reports
+# as `program` and matches LongPressBlocklist against. Verified in fcitx5's own
+# log: a Brave window logs `program: brave-browser`, which is its class -- not
+# `brave`, which is what /proc/<pid>/comm says. Picking the process name
+# silently blocks nothing.
+set -uo pipefail
+hyprctl clients -j 2>/dev/null | python3 -c '
+import json, sys
+seen, out = set(), []
+try:
+    clients = json.load(sys.stdin)
+except Exception:
+    clients = []
+for c in clients:
+    value = (c.get("initialClass") or c.get("class") or "").strip()
+    if not value or value in seen:
+        continue
+    seen.add(value)
+    out.append({"value": value,
+                "label": value,
+                "description": (c.get("title") or "")[:60]})
+# Stock fcitx5 ships konsole blocked; keep the idea discoverable even when the
+# application is not currently running.
+for extra in ("konsole",):
+    if extra not in seen:
+        out.append({"value": extra, "label": extra, "description": "not running"})
+json.dump(sorted(out, key=lambda o: o["value"]), sys.stdout)
+'

@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+#
+# Build and install the fcitx5 addon into the user's own directories.
+#
+#   omacento-build           build only if missing or built against another fcitx5
+#   omacento-build --force   build regardless
+#   omacento-build --check   report status, write nothing, exit 1 if a build is due
+#
+# Exit 10 means "installed a new .so". fcitx5 only scans for addons at startup,
+# so the caller has to restart it — this script must not, because it also runs
+# as ExecStartPre of the very unit it would be restarting.
+#
+# A fcitx5 addon is tied to the fcitx5 it was compiled against, so an upgrade
+# silently stops the popup from loading. This script is wired into
+# omarchy-fcitx5.service as ExecStartPre, so the rebuild happens on the next
+# start after an upgrade rather than on the next time the user notices.
+
+set -uo pipefail
+
+HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ADDON="$HERE/addon"
+PREFIX="${OMACENTO_PREFIX:-$HOME/.local}"
+SO="$PREFIX/lib/fcitx5/libomacento.so"
+CONF="$PREFIX/share/fcitx5/addon/omacento.conf"
+
+MODE="${1:-}"
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+want_version() { pkg-config --modversion Fcitx5Core 2>/dev/null; }
+have_version() { [ -f "$CONF" ] && sed -n 's/^Version=//p' "$CONF" | head -1; }
+
+WANT="$(want_version)"
+GOT="$(have_version)"
+
+if [ -z "$WANT" ]; then
+  echo "omacento-build: fcitx5 development files not found (pkg-config Fcitx5Core)" >&2
+  exit 2
+fi
+
+status="ok"
+[ -f "$SO" ] || status="missing"
+[ "$GOT" = "$WANT" ] || status="stale"
+
+if [ "$MODE" = "--check" ]; then
+  case "$status" in
+    ok)      echo "omacento-build: up to date (fcitx5 $WANT)"; exit 0 ;;
+    missing) echo "omacento-build: addon not installed"; exit 1 ;;
+    stale)   echo "omacento-build: built for fcitx5 ${GOT:-unknown}, running $WANT"; exit 1 ;;
+  esac
+fi
+
+if [ "$MODE" != "--force" ] && [ "$status" = "ok" ]; then
+  exit 0
+fi
+
+if ! have g++ || ! have make; then
+  echo "omacento-build: need g++ and make (pacman -S base-devel)" >&2
+  exit 2
+fi
+
+echo "omacento-build: building against fcitx5 $WANT"
+make -C "$ADDON" clean >/dev/null 2>&1
+if ! make -C "$ADDON" >/dev/null; then
+  echo "omacento-build: compile failed" >&2
+  exit 1
+fi
+if ! make -C "$ADDON" PREFIX="$PREFIX" install >/dev/null; then
+  echo "omacento-build: install failed" >&2
+  exit 1
+fi
+echo "omacento-build: installed $SO"
+exit 10
