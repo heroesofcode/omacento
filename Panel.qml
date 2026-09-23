@@ -181,6 +181,23 @@ Panel {
               fontFamily: root.fontFamily
             }
 
+            SettingDropdown {
+              width: (parent.width - Style.space(18)) / 2
+              label: "Accent set"
+              actionOptions: Model.LANGUAGES
+              boundValue: root.get("language")
+              onPicked: function(v) { root.save({ language: v }) }
+            }
+
+            Text {
+              width: parent.width
+              text: "Every set reaches the same characters — what changes is the order, and the order is what you actually feel. Português puts ã second on \"a\"; Français puts à first."
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
+
             Item {
               width: parent.width
               implicitHeight: delayLabel.implicitHeight + Style.space(6) + delaySlider.implicitHeight
@@ -353,4 +370,24 @@ Panel {
     }
   }
 
+  // Dropdown that reports its popup state, so the panel's key catcher stops
+  // competing for j/k while a list is open.
+  //
+  // `value` is driven from `boundValue` through a handler rather than bound
+  // straight to it: Dropdown assigns to its own `value` when a row is chosen,
+  // which would destroy a declarative binding and leave the control deaf to
+  // any later change made elsewhere.
+  component SettingDropdown: Dropdown {
+    property string boundValue: ""
+    property var actionOptions: []
+
+    signal picked(string value)
+
+    options: actionOptions
+    value: boundValue
+
+    onBoundValueChanged: if (value !== boundValue) value = boundValue
+    onChanged: function(v) { picked(v) }
+    onPopupOpenChanged: root.dropdownOwnsKeys = popupOpen
+  }
 }
