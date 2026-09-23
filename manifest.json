@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.heroesofcode.omacento",
   "name": "Omacento",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "heroesofcode",
   "license": "MIT",
   "description": "macOS-style press-and-hold accents for Hyprland. Hold a vowel, a popup opens at the cursor with every accented form, and a digit or arrow picks one. Ships a small fcitx5 addon with its own timer, so the hold time is a real setting and key repeat is left alone. Nine accent sets — Português, Español, Français, Deutsch, Italiano, Polski, Türkçe, Nordisk, English — ordered so the accents your language uses come first. Themed to match Omarchy.",
