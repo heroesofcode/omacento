@@ -241,13 +241,15 @@ So commit messages decide the version, and they follow
 `release-please-config.json`; `.release-please-manifest.json` is where it
 remembers the current version. Neither is meant to be edited by hand.
 
-One wrinkle worth knowing before it puzzles you: a pull request opened with the
-default `GITHUB_TOKEN` does not trigger other workflows — GitHub blocks that to
-stop workflows retriggering themselves — so the release PR shows up without the
-`test` check that `main` requires. **Close and reopen it once** and the check
-runs, because that is a human action. To skip the ritual, put a fine-grained
-PAT (Contents and Pull requests, read/write) in a `RELEASE_PLEASE_TOKEN`
-secret; the workflow prefers it when present.
+One thing to watch, with a caveat. GitHub documents that a pull request opened
+with the default `GITHUB_TOKEN` does not trigger other workflows, which would
+leave the release PR without the `test` check that `main` requires. **That did
+not happen here**: on the 1.1.0 release PR, opened by `github-actions` with no
+PAT configured, `test` ran four seconds later and the PR was mergeable. So do
+not go looking for the problem — but if a release PR ever does show up with no
+check, close and reopen it once and the check runs, because that is a human
+action. A fine-grained PAT in a `RELEASE_PLEASE_TOKEN` secret also avoids it;
+the workflow prefers that secret when present.
 
 Pull requests are merged with **rebase**, so every commit message lands on
 `main` verbatim and every one of them is parsed. A stray `wip` commit in a
