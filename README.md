@@ -172,8 +172,8 @@ So commit messages decide the version, and they follow
 | `fix:` | patch bump — 1.0.0 to 1.0.1 |
 | `feat:` | minor bump — 1.0.0 to 1.1.0 |
 | `feat!:` or a `BREAKING CHANGE:` footer | major bump — 1.0.0 to 2.0.0 |
-| `docs:` `refactor:` `perf:` | shown in the changelog, no bump on their own |
-| `ci:` `test:` `chore:` | no bump, hidden from the changelog |
+| `refactor:` `perf:` | patch bump, shown in the changelog |
+| `docs:` `ci:` `test:` `chore:` | no bump, not in the changelog |
 
 `manifest.json` is bumped by release-please through the `extra-files` rule in
 `release-please-config.json`; `.release-please-manifest.json` is where it
