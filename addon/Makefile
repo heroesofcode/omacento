@@ -36,7 +36,23 @@ uninstall:
 	@rm -f $(LIBDIR)/libomacento.so $(CONFDIR)/omacento.conf
 	@echo "removed libomacento.so and omacento.conf"
 
+# Runs the addon inside a real fcitx5 Instance with fcitx5's own TestFrontend.
+# The .conf files go into a throwaway data dir so the test exercises the object
+# just built here, never whatever happens to be installed in ~/.local.
+TESTDATA := $(BUILD)/testdata
+
+test: $(TARGET) $(BUILD)/omacento.conf
+	@mkdir -p $(TESTDATA)/addon
+	@cp $(BUILD)/omacento.conf $(TESTDATA)/addon/omacento.conf
+	@cp test/addon/testfrontend.conf $(TESTDATA)/addon/testfrontend.conf
+	$(CXX) $(CXXFLAGS) -I/usr/include/Fcitx5/Module \
+	  -DTESTING_BINARY_DIR=\"$(CURDIR)/$(BUILD)\" \
+	  -DTESTING_ADDON_DIR=\"$(CURDIR)/$(BUILD)\" \
+	  -DTESTING_DATA_DIR=\"$(CURDIR)/$(TESTDATA)\" \
+	  -o $(BUILD)/test_omacento test/test_omacento.cpp $(LDLIBS)
+	@$(BUILD)/test_omacento
+
 clean:
 	@rm -rf $(BUILD)
 
-.PHONY: all install uninstall clean
+.PHONY: all install uninstall clean test

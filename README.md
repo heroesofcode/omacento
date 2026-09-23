@@ -134,6 +134,29 @@ panel and the CLI cannot disagree.
 
 It deliberately writes **nothing** under `~/.config/hypr`.
 
+## Tests
+
+```bash
+make -C addon test
+```
+
+This loads the freshly built `libomacento.so` into a real fcitx5 `Instance`
+alongside fcitx5's own `TestFrontend`, sends key events, and checks what comes
+back out. Ten cases: tap, hold-and-pick, arrow-and-Enter, `Esc`, flush by a
+second key, the uppercase table, `Ctrl+A` staying untouched, the blocklist, a
+digit past the end of the list, and the off switch.
+
+Two independent checks run at once. `pushCommitExpectation` aborts at the exact
+commit that goes wrong, which is where the useful stack trace is; and the test
+records every commit itself and compares the whole sequence at the end, because
+the first check cannot see a commit that never happens — an addon that committed
+nothing would otherwise pass with every expectation still queued.
+
+The waits are against the addon's real timer, so the margins are deliberately
+wide (a 20 ms tap against a 300 ms hold). An earlier 3x margin failed about one
+run in five on a busy machine: the tap slipped past the threshold, became a
+hold, and threw every later expectation off by one.
+
 ## Things that are true and not obvious
 
 **fcitx5 only searches `/usr/lib/fcitx5` for addons.** `StandardPathsType::Addon`
