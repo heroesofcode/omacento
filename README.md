@@ -77,6 +77,44 @@ Everything else the scripts reach for ships with Omarchy already: `python3`
 classes for the blocklist), `systemctl` (the fcitx5 user service), plus `awk`,
 `sed` and `grep`. Nothing is fetched from the network at any point.
 
+## Languages
+
+Nine sets ship: Português, Español, Français, Deutsch, Italiano, Polski,
+Türkçe, Nordisk and English (international). Pick one in the panel.
+
+They differ in **order**, not in reach — every set can still get to the same
+characters, further down the row. Order is what you actually feel, because the
+first two land on `1` and `2`:
+
+```
+Português   á  ã  â  à  ä  å  ā  æ
+Français    à  â  á  ä  ã  æ  å
+Deutsch     ä  à  á  â  ã  å  æ
+```
+
+Only the lowercase half of a set is written down. The uppercase half is
+derived, so adding a language cannot leave Shift half-working. That derivation
+is not as simple as it looks: Latin Extended-A stores case pairs with the
+uppercase on the even codepoint for most of the block and on the *odd* one for
+two stretches of it, so a single parity rule handles `ć` and `š` correctly
+while quietly leaving `ł`, `ź`, `ż` and `ž` alone — Polish breaks and nothing
+else does. The ranges are spelled out in `addon/src/presets.cpp`, and the test
+suite checks the ones that flip.
+
+To go beyond the presets, set `Table` in
+`~/.config/fcitx5/conf/omacento.conf` — one entry per key, the base character
+then its variants, space separated, lowercase only:
+
+```ini
+[Table]
+0=a á ã â à
+1=ç ć č
+```
+
+A base character does not have to be ASCII: the lookup is on the character the
+key produces, not on its keysym, so a layout whose key already yields `ç` can
+hang more variants off it.
+
 ## It is not an input method
 
 It does not appear in your input method list and does not change your keyboard
@@ -90,6 +128,7 @@ only reacts to a held key.
 | Setting | Default | Notes |
 |---|---|---|
 | Enabled | on | right-clicking the bar icon toggles it |
+| Accent set | Português | nine languages; changes the order, not the reach |
 | Hold before the popup | 250 ms | its own timer; macOS sits near 500 |
 | Stack candidates vertically | off | one row by default |
 | Popup text size | 14 | fcitx5's stock 10 is small next to a terminal |

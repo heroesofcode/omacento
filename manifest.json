@@ -35,6 +35,7 @@
     "defaultSection": "right",
     "defaults": {
       "enabled": true,
+      "language": "ptbr",
       "holdTime": 250,
       "vertical": false,
       "fontSize": 14,
@@ -49,6 +50,24 @@
         "label": "Accents enabled",
         "defaultValue": true,
         "description": "Turn the long-press popup off without undoing any of the setup. Right-clicking the bar icon toggles this too."
+      },
+      {
+        "key": "language",
+        "type": "enum",
+        "label": "Accent set",
+        "options": [
+          "ptbr",
+          "es",
+          "fr",
+          "de",
+          "it",
+          "pl",
+          "tr",
+          "nordic",
+          "en"
+        ],
+        "defaultValue": "ptbr",
+        "description": "Which language the accents are ordered for. Every set reaches the same characters; what changes is which ones land on 1 and 2. Portuguese puts a-tilde second on 'a'; French puts the grave first."
       },
       {
         "key": "holdTime",

@@ -5,28 +5,13 @@
 #include <fcitx-utils/keysymgen.h>
 #include <fcitx-utils/log.h>
 #include <fcitx-utils/stringutils.h>
+#include <fcitx-utils/utf8.h>
 #include <fcitx/userinterface.h>
 
 namespace omacento {
 namespace {
 
 constexpr char kConfigPath[] = "conf/omacento.conf";
-
-// Ordered for Brazilian Portuguese: the forms a pt-BR writer reaches for come
-// first, so the common ones land on 1 and 2. fcitx5's own table is ordered for
-// English and German, which buries the tilde in sixth place.
-const std::vector<std::string> &builtinTable() {
-    static const std::vector<std::string> t = {
-        "a á ã â à ä å ā æ", "e é ê è ë ē ę",     "i í î ì ï ī",
-        "o ó õ ô ò ö ø ō œ", "u ú û ù ü ū",       "c ç ć č",
-        "n ñ ń ň",           "y ý ÿ",             "s š ś ş",
-        "z ž ź ż",           "A Á Ã Â À Ä Å Ā Æ", "E É Ê È Ë Ē Ę",
-        "I Í Î Ì Ï Ī",       "O Ó Õ Ô Ò Ö Ø Ō Œ", "U Ú Û Ù Ü Ū",
-        "C Ç Ć Č",           "N Ñ Ń Ň",           "Y Ý Ÿ",
-        "S Š Ś Ş",           "Z Ž Ź Ż",
-    };
-    return t;
-}
 
 // Shift and the lock keys are part of producing the letter; anything else means
 // the key is a shortcut and is none of our business.
@@ -75,19 +60,56 @@ void Omacento::setConfig(const fcitx::RawConfig &raw) {
 void Omacento::applyConfig() {
     holdUsec_ = static_cast<uint64_t>(*config_.holdTime) * 1000ULL;
 
-    const auto &entries =
-        config_.table->empty() ? builtinTable() : *config_.table;
+    std::vector<std::string> entries;
+    std::string source;
+    if (!config_.table->empty()) {
+        entries = *config_.table;
+        source = "custom";
+    } else if (const Preset *p = presetFor(*config_.language)) {
+        entries = p->entries;
+        source = p->id;
+    } else {
+        // An unknown language must not leave the user with no accents at all.
+        entries = presets().front().entries;
+        source = presets().front().id + " (fallback)";
+        FCITX_WARN() << "omacento: unknown language '" << *config_.language
+                     << "', falling back to " << presets().front().id;
+    }
+
     table_.clear();
     for (const auto &entry : entries) {
         auto parts = fcitx::stringutils::split(entry, " \t");
-        if (parts.size() < 2 || parts[0].size() != 1) {
+        if (parts.size() < 2) {
             continue;
         }
-        const auto base = static_cast<unsigned char>(parts[0][0]);
-        table_[base] = Variants(parts.begin() + 1, parts.end());
+        // Keyed by the character the key produces, not by its keysym, so a
+        // base character outside ASCII works the same as one inside it.
+        const uint32_t base = fcitx::utf8::getChar(parts[0]);
+        if (!fcitx::utf8::isValidChar(base)) {
+            continue;
+        }
+        Variants lower(parts.begin() + 1, parts.end());
+        table_[base] = lower;
+
+        // Derive the uppercase half rather than asking every preset to repeat
+        // itself. A variant with no uppercase form is kept as it is.
+        const uint32_t upperBase = upperCodepoint(base);
+        if (upperBase == base) {
+            continue;
+        }
+        Variants upper;
+        upper.reserve(lower.size());
+        for (const auto &v : lower) {
+            const uint32_t cp = fcitx::utf8::getChar(v);
+            upper.push_back(fcitx::utf8::isValidChar(cp)
+                                ? fcitx::utf8::UCS4ToUTF8(upperCodepoint(cp))
+                                : v);
+        }
+        table_.emplace(upperBase, std::move(upper));
     }
+
     FCITX_INFO() << "omacento: hold " << *config_.holdTime << "ms, "
-                 << table_.size() << " keys, "
+                 << source << ", " << table_.size() << " keys, "
                  << (*config_.enabled ? "enabled" : "disabled");
 }
 
@@ -275,14 +297,15 @@ void Omacento::onKeyEvent(fcitx::KeyEvent &event) {
     if (!modifiersAllow(key) || key.states().test(fcitx::KeyState::Repeat)) {
         return;
     }
-    const Variants *variants = lookup(sym);
+    const uint32_t cp = fcitx::Key::keySymToUnicode(key.sym());
+    const Variants *variants = cp ? lookup(cp) : nullptr;
     if (!variants || variants->empty() || blocked(ic)) {
         return;
     }
 
     state->phase = Phase::Pending;
     state->heldSym = sym;
-    state->base = std::string(1, static_cast<char>(sym));
+    state->base = fcitx::utf8::UCS4ToUTF8(cp);
     state->variants = *variants;
     // Deliberately no preedit here. A tap is by far the common case and must
     // look like a plain keystroke to the application: one commit, no

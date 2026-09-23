@@ -19,8 +19,10 @@ all: $(TARGET) $(BUILD)/omacento.conf
 $(BUILD):
 	@mkdir -p $(BUILD)
 
-$(TARGET): src/omacento.cpp src/omacento.h | $(BUILD)
-	$(CXX) $(CXXFLAGS) -shared -o $@ src/omacento.cpp $(LDLIBS)
+SRC := src/omacento.cpp src/presets.cpp
+
+$(TARGET): $(SRC) src/omacento.h src/presets.h | $(BUILD)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(SRC) $(LDLIBS)
 
 # The addon metadata must name the exact fcitx5 it was built against, so a
 # version bump shows up as "addon did not load" rather than as a crash.
@@ -49,7 +51,7 @@ test: $(TARGET) $(BUILD)/omacento.conf
 	  -DTESTING_BINARY_DIR=\"$(CURDIR)/$(BUILD)\" \
 	  -DTESTING_ADDON_DIR=\"$(CURDIR)/$(BUILD)\" \
 	  -DTESTING_DATA_DIR=\"$(CURDIR)/$(TESTDATA)\" \
-	  -o $(BUILD)/test_omacento test/test_omacento.cpp $(LDLIBS)
+	  -o $(BUILD)/test_omacento test/test_omacento.cpp src/presets.cpp $(LDLIBS)
 	@$(BUILD)/test_omacento
 
 clean:

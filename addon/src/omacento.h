@@ -23,6 +23,8 @@
 #include <fcitx/inputpanel.h>
 #include <fcitx/instance.h>
 
+#include "presets.h"
+
 namespace omacento {
 
 FCITX_CONFIGURATION(
@@ -35,10 +37,15 @@ FCITX_CONFIGURATION(
     fcitx::Option<std::vector<std::string>> blocklist{
         this, "Blocklist",
         "Window classes where a held key should just repeat", {}};
+    fcitx::Option<std::string> language{
+        this, "Language",
+        "Which accent set to use: ptbr, es, fr, de, it, pl, tr, nordic, en",
+        "ptbr"};
     fcitx::Option<std::vector<std::string>> table{
         this, "Table",
-        "One entry per key: the base letter, then its variants, space "
-        "separated. Empty means the built-in table.",
+        "Overrides the language: one entry per key, the base character then "
+        "its variants, space separated. Lowercase only -- uppercase is "
+        "derived. Empty means use the language preset.",
         {}};);
 
 enum class Phase { Idle, Pending, Picking };

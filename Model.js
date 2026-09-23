@@ -12,8 +12,27 @@
 // Repeated on purpose: the shell hands a freshly enabled widget an empty
 // settings object, so reading the manifest alone would write a half-configured
 // addon on first run and only come good once the user touched something.
+// Mirrors the presets in addon/src/presets.cpp, which is the source of truth.
+// If the two ever drift the addon warns and falls back to ptbr rather than
+// leaving someone with no accents at all.
+var LANGUAGES = [
+  { value: "ptbr",   label: "Português" },
+  { value: "es",     label: "Español" },
+  { value: "fr",     label: "Français" },
+  { value: "de",     label: "Deutsch" },
+  { value: "it",     label: "Italiano" },
+  { value: "pl",     label: "Polski" },
+  { value: "tr",     label: "Türkçe" },
+  { value: "nordic", label: "Nordisk" },
+  { value: "en",     label: "English (intl.)" }
+]
+
 var DEFAULTS = {
   enabled: true,
+
+  // Which accent set, and in which order. Every language can reach the same
+  // characters; what changes is which ones land on 1 and 2.
+  language: "ptbr",
 
   // The addon runs its own millisecond timer, so this is a real hold time and
   // touches nothing else. macOS sits around 500ms; 250 feels quick without
@@ -25,6 +44,13 @@ var DEFAULTS = {
   font: "",          // empty inherits the terminal's family
   themeSync: true,
   blocklist: []
+}
+
+function labelForLanguage(value) {
+  for (var i = 0; i < LANGUAGES.length; i++) {
+    if (LANGUAGES[i].value === value) return LANGUAGES[i].label
+  }
+  return value
 }
 
 function defaultFor(key) {
@@ -48,7 +74,7 @@ function commandFor(scriptPath, get) {
 // One-line description for the bar tooltip.
 function summary(get) {
   if (!get("enabled")) return "Accents off"
-  var bits = [get("holdTime") + "ms hold"]
+  var bits = [labelForLanguage(get("language")), get("holdTime") + "ms hold"]
   var blocked = get("blocklist")
   if (blocked && blocked.length) bits.push(blocked.length + " app" + (blocked.length > 1 ? "s" : "") + " blocked")
   return "Hold a vowel · " + bits.join(" · ")

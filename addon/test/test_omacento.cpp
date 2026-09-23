@@ -95,8 +95,9 @@ int main() {
             commits.push_back(static_cast<CommitStringEvent &>(event).text());
         });
 
-    const std::vector<std::string> wanted = {"a", "ã", "o", "e", "Ã",
-                                             "i", "u", "õ", "c", "e"};
+    const std::vector<std::string> wanted = {"a", "ã", "o", "e",  "Ã", "i", "u",
+                                             "õ", "c", "e", "à",  "Ł", "á",
+                                             "ć"};
 
     int failures = 0;
     instance.eventDispatcher().schedule([&instance, &failures]() {
@@ -205,6 +206,44 @@ int main() {
             press("e");
         });
         script->add(kWithin, [=] { release("e"); });
+
+        auto setLanguage = [addon](const char *id) {
+            RawConfig c;
+            c.setValueByPath("Language", id);
+            addon->setConfig(c);
+        };
+
+        // 11. The language decides the order, not just the contents. French
+        //     puts the grave first on "a" where Portuguese puts the acute.
+        script->add(10, [=] { setLanguage("fr"); expect("à"); press("a"); });
+        script->add(kBeyond, [=] { press("1"); release("1"); });
+        script->add(10, [=] { release("a"); });
+
+        // 12. Uppercase is derived, never written out by hand. Polish l -> ł
+        //     sits in the half of Latin Extended-A where the case pairs flip
+        //     parity, which a naive rule gets wrong while leaving ć and š
+        //     looking fine.
+        script->add(10, [=] { setLanguage("pl"); expect("Ł"); press("L"); });
+        script->add(kBeyond, [=] { press("1"); release("1"); });
+        script->add(10, [=] { release("L"); });
+
+        // 13. An unknown language must not leave someone with no accents.
+        script->add(10, [=] { setLanguage("klingon"); expect("á"); press("a"); });
+        script->add(kBeyond, [=] { press("1"); release("1"); });
+        script->add(10, [=] { release("a"); });
+
+        // 14. A custom table overrides the language, and its base character
+        //     may be outside ASCII -- the lookup is by the character the key
+        //     produces, not by a single byte.
+        script->add(10, [=] {
+            RawConfig c;
+            c.setValueByPath("Table/0", "ç ć č");
+            addon->setConfig(c);
+            expect("ć");
+            press("ccedilla");
+        });
+        script->add(kBeyond, [=] { press("1"); release("1"); });
+        script->add(10, [=] { release("ccedilla"); });
 
         script->run();
     });
