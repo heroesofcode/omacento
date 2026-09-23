@@ -1,0 +1,30 @@
+name: test
+
+# Pull requests are the gate: main is protected and only moves through one.
+# Also runs on main itself so the default branch keeps a visible status.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # Arch, because the addon is compiled against whatever fcitx5 the distro
+    # ships and pinned to its exact version. Testing on another distro's fcitx5
+    # would prove something about a build nobody runs.
+    container: archlinux:base-devel
+
+    steps:
+      # Before checkout: the action needs git, and the image has neither it nor
+      # fcitx5.
+      - name: Install fcitx5 and git
+        run: pacman -Syu --noconfirm --needed fcitx5 git
+
+      - uses: actions/checkout@v4
+
+      - name: Build the addon
+        run: make -C addon
+
+      - name: Run the test suite
+        run: make -C addon test
