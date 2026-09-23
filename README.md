@@ -115,6 +115,26 @@ A base character does not have to be ASCII: the lookup is on the character the
 key produces, not on its keysym, so a layout whose key already yields `ç` can
 hang more variants off it.
 
+## Updating
+
+```bash
+omarchy plugin update io.github.heroesofcode.omacento
+omarchy-restart-shell
+```
+
+The second line is not optional, and it is not specific to this plugin.
+`omarchy plugin update` calls `rescanPlugins`, which does **not** re-read a
+plugin's QML — measured by changing a label in both `Panel.qml` and `Model.js`
+and watching the panel keep the old text until the shell was restarted. A
+first-time install needs no restart, because there is no previously compiled
+copy to go stale.
+
+Note `omarchy-restart-shell`, not `omarchy-refresh-shell`: the latter resets
+`shell.json` to Omarchy's defaults and takes every plugin off your bar.
+
+The addon half looks after itself — `omacento-apply` restarts fcitx5 when it
+installs a new build, so only the panel needs the shell restart.
+
 ## It is not an input method
 
 It does not appear in your input method list and does not change your keyboard
