@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.heroesofcode.omacento",
   "name": "Omacento",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "heroesofcode",
   "license": "MIT",
   "description": "macOS-style press-and-hold accents for Hyprland. Hold a vowel, a popup opens at the cursor with every accented form, and a digit or arrow picks one. Ships a small fcitx5 addon with its own timer, so the hold time is a real setting and key repeat is left alone. Ordered for Portuguese, themed to match Omarchy.",
@@ -94,7 +94,7 @@
         "type": "list",
         "label": "Turned off in",
         "defaultValue": [],
-        "description": "Window classes where holding a key should repeat it instead of opening the popup \u2014 a game, or an application whose own key repeat fights the picker. Matched against the window class ('brave-browser'), not the process name ('brave')."
+        "description": "Window classes where holding a key should repeat it instead of opening the popup — a game, or an application whose own key repeat fights the picker. Matched against the window class ('brave-browser'), not the process name ('brave')."
       }
     ]
   }
