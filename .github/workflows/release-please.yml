@@ -14,14 +14,13 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v5
         with:
-          # A PR opened with the default GITHUB_TOKEN does not trigger other
-          # workflows, so the release PR arrives without the `test` check that
-          # main requires. Two ways to deal with that, neither blocking:
-          #   - set RELEASE_PLEASE_TOKEN to a fine-grained PAT (Contents and
-          #     Pull requests, read/write) and checks run by themselves, or
-          #   - close and reopen the release PR once; that is a human action,
-          #     so it does trigger the check.
-          # The fallback below keeps this working with no secret configured.
+          # GitHub documents that a PR opened with the default GITHUB_TOKEN
+          # does not trigger other workflows, which would leave the release PR
+          # without the `test` check main requires. Measured on the 1.1.0
+          # release PR: it did trigger, with no PAT set. Keeping the override
+          # anyway, because the documented behaviour is what to expect if it
+          # ever stops -- and closing and reopening the PR is the no-secret way
+          # out.
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
