@@ -21,7 +21,7 @@ jobs:
       - name: Install fcitx5 and git
         run: pacman -Syu --noconfirm --needed fcitx5 git
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build the addon
         run: make -C addon
