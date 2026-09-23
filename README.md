@@ -157,6 +157,33 @@ wide (a 20 ms tap against a 300 ms hold). An earlier 3x margin failed about one
 run in five on a busy machine: the tap slipped past the threshold, became a
 hold, and threw every later expectation off by one.
 
+## Releasing
+
+Versions are not edited by hand. release-please watches `main`, reads the
+commit messages, and keeps a release pull request open with the next version
+number and a generated `CHANGELOG.md`. Merging that PR tags the release and
+publishes it.
+
+So commit messages decide the version, and they follow
+[Conventional Commits](https://www.conventionalcommits.org):
+
+| Prefix | Effect |
+|---|---|
+| `fix:` | patch bump — 1.0.0 to 1.0.1 |
+| `feat:` | minor bump — 1.0.0 to 1.1.0 |
+| `feat!:` or a `BREAKING CHANGE:` footer | major bump — 1.0.0 to 2.0.0 |
+| `docs:` `refactor:` `perf:` | shown in the changelog, no bump on their own |
+| `ci:` `test:` `chore:` | no bump, hidden from the changelog |
+
+`manifest.json` is bumped by release-please through the `extra-files` rule in
+`release-please-config.json`; `.release-please-manifest.json` is where it
+remembers the current version. Neither is meant to be edited by hand.
+
+Pull requests are merged with **rebase**, so every commit message lands on
+`main` verbatim and every one of them is parsed. A stray `wip` commit in a
+branch becomes a stray `wip` commit in the history — squash locally first, or
+switch the repository to squash-merge so only the PR title counts.
+
 ## Things that are true and not obvious
 
 **fcitx5 only searches `/usr/lib/fcitx5` for addons.** `StandardPathsType::Addon`

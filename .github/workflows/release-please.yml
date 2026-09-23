@@ -1,0 +1,24 @@
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v5
+        with:
+          # A PR opened with the default GITHUB_TOKEN does not trigger other
+          # workflows, so the release PR would never get the `test` check that
+          # main requires -- and would sit unmergeable forever. A PAT in
+          # RELEASE_PLEASE_TOKEN avoids that. The fallback keeps this workflow
+          # working (releases just need the check waived) when it is absent.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
