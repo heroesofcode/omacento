@@ -9,8 +9,11 @@ arrow picks one.
 The digit sits under the character rather than beside it, the way macOS draws
 it.
 
-Ordered for Brazilian Portuguese — `á ã â à` on `a`, `ó õ ô ò` on `o`, `ç`
-first on `c` — and themed from the current Omarchy palette.
+Nine accent sets — Português, Español, Français, Deutsch, Italiano, Polski,
+Türkçe, Nordisk and English — picked from the panel. They differ in **order**,
+not in reach: each one puts the accents that language actually uses on `1` and
+`2`. Portuguese leads with `á ã â à`; French leads with `à â á ä`. The popup is
+themed from the current Omarchy palette.
 
 ## What it actually is
 

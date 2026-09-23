@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "heroesofcode",
   "license": "MIT",
-  "description": "macOS-style press-and-hold accents for Hyprland. Hold a vowel, a popup opens at the cursor with every accented form, and a digit or arrow picks one. Ships a small fcitx5 addon with its own timer, so the hold time is a real setting and key repeat is left alone. Ordered for Portuguese, themed to match Omarchy.",
+  "description": "macOS-style press-and-hold accents for Hyprland. Hold a vowel, a popup opens at the cursor with every accented form, and a digit or arrow picks one. Ships a small fcitx5 addon with its own timer, so the hold time is a real setting and key repeat is left alone. Nine accent sets — Português, Español, Français, Deutsch, Italiano, Polski, Türkçe, Nordisk, English — ordered so the accents your language uses come first. Themed to match Omarchy.",
   "kinds": [
     "bar-widget"
   ],
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "Omacento",
-    "description": "Press-and-hold accent picker: tune the hold time, the popup's looks, and which applications it stays out of.",
+    "description": "Press-and-hold accent picker: choose the accent set for your language, tune the hold time and the popup's looks, and pick which applications it stays out of.",
     "category": "Input",
     "aliases": [
       "accent",
@@ -29,7 +29,27 @@
       "portuguese",
       "fcitx",
       "fcitx5",
-      "macbook"
+      "macbook",
+      "idioma",
+      "language",
+      "español",
+      "espanol",
+      "spanish",
+      "français",
+      "francais",
+      "french",
+      "deutsch",
+      "german",
+      "italiano",
+      "italian",
+      "polski",
+      "polish",
+      "türkçe",
+      "turkce",
+      "turkish",
+      "nordisk",
+      "nordic",
+      "english"
     ],
     "allowMultiple": false,
     "defaultSection": "right",
@@ -113,7 +133,7 @@
         "type": "list",
         "label": "Turned off in",
         "defaultValue": [],
-        "description": "Window classes where holding a key should repeat it instead of opening the popup \u2014 a game, or an application whose own key repeat fights the picker. Matched against the window class ('brave-browser'), not the process name ('brave')."
+        "description": "Window classes where holding a key should repeat it instead of opening the popup — a game, or an application whose own key repeat fights the picker. Matched against the window class ('brave-browser'), not the process name ('brave')."
       }
     ]
   }
