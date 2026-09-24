@@ -1,0 +1,25 @@
+version: 2
+
+# The only versions this repository pins are the two actions its workflows use;
+# the addon itself is built with make against whatever fcitx5 the distribution
+# ships, and there is no dependency manifest anywhere. Both actions are pinned
+# by major tag, so this is quiet by construction -- it speaks up when checkout
+# or release-please cuts a new major, which is the update that breaks a pipeline
+# without anyone touching it.
+#
+# The archlinux:base-devel container is deliberately not watched: it is a
+# rolling tag with no version to bump, and dependabot does not read the
+# container field of a workflow anyway.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # release-please reads every commit that lands on main. `chore` is hidden
+    # from the changelog and bumps nothing, which is what a version bump of the
+    # CI's own tooling should do.
+    commit-message:
+      prefix: chore
+    groups:
+      actions:
+        patterns: ["*"]
