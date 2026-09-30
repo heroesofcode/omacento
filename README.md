@@ -276,6 +276,11 @@ turning into a bug report.
 reports Brave as `brave-browser`, not `brave`. `omacento-apps` reads Hyprland's
 `initialClass` for exactly this reason.
 
+**The keysym is not stable across a press.** Let go of Shift before the letter
+and a key that went down as `A` comes back up as `a`. Matching the release by
+keysym missed it, and the popup opened on a key nobody was holding any more.
+The held key is matched by keycode.
+
 **On Wayland one input context serves every field.** The `wayland_v2` frontend
 keeps a single input context per seat, and a focus change is a deactivate and
 an activate on that same context. So whatever this addon was holding followed

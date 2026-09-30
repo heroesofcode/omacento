@@ -24,6 +24,16 @@ bool modifiersAllow(const fcitx::Key &key) {
     return (key.states() & blocking).toInteger() == 0;
 }
 
+// The key being held, recognised by keycode where the frontend reports one.
+// The keysym is not stable across a press: let go of Shift before the letter
+// and a key that went down as "A" comes back up as "a".
+bool sameKey(const fcitx::Key &held, const fcitx::Key &key) {
+    if (held.code() != 0 && key.code() != 0) {
+        return held.code() == key.code();
+    }
+    return held.sym() == key.sym();
+}
+
 fcitx::CommonCandidateList *candidates(fcitx::InputContext *ic) {
     return dynamic_cast<fcitx::CommonCandidateList *>(
         ic->inputPanel().candidateList().get());
@@ -163,7 +173,7 @@ void Omacento::setPreedit(fcitx::InputContext *ic, const std::string &text) {
 void Omacento::reset(fcitx::InputContext *ic, OmacentoState *state) {
     state->disarm();
     state->phase = Phase::Idle;
-    state->heldSym = 0;
+    state->heldKey = fcitx::Key();
     state->base.clear();
     state->variants.clear();
     // Only touch the panel if we actually put something in it. Ordinary typing
@@ -231,12 +241,12 @@ void Omacento::onKeyEvent(fcitx::KeyEvent &event) {
     if (state->phase == Phase::Picking) {
         if (event.isRelease()) {
             // The popup outlives the release, as it does on macOS.
-            if (sym == state->heldSym) {
+            if (sameKey(state->heldKey, event.rawKey())) {
                 event.filterAndAccept();
             }
             return;
         }
-        if (sym == state->heldSym) {
+        if (sameKey(state->heldKey, event.rawKey())) {
             // Still holding. Auto-repeat must neither retype the letter behind
             // the open popup nor close it.
             event.filterAndAccept();
@@ -291,14 +301,14 @@ void Omacento::onKeyEvent(fcitx::KeyEvent &event) {
         commitAndReset(ic, state, state->base);
     } else if (state->phase == Phase::Pending) {
         if (event.isRelease()) {
-            if (sym == state->heldSym) {
+            if (sameKey(state->heldKey, event.rawKey())) {
                 // A tap, not a hold.
                 commitAndReset(ic, state, state->base);
                 event.filterAndAccept();
             }
             return;
         }
-        if (sym == state->heldSym) {
+        if (sameKey(state->heldKey, event.rawKey())) {
             // Auto-repeat of the held key. Our timer decides, not the repeat.
             event.filterAndAccept();
             return;
@@ -319,7 +329,7 @@ void Omacento::onKeyEvent(fcitx::KeyEvent &event) {
     }
 
     state->phase = Phase::Pending;
-    state->heldSym = sym;
+    state->heldKey = event.rawKey();
     state->base = fcitx::utf8::UCS4ToUTF8(cp);
     state->variants = *variants;
     // Deliberately no preedit here. A tap is by far the common case and must
