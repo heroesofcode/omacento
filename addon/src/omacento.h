@@ -55,7 +55,9 @@ using Variants = std::vector<std::string>;
 class OmacentoState : public fcitx::InputContextProperty {
 public:
     Phase phase = Phase::Idle;
-    uint32_t heldSym = 0;
+    // The key as it went down. Matched by keycode, because the keysym can
+    // change before it comes back up.
+    fcitx::Key heldKey;
     std::string base;
     Variants variants;
     bool preeditShown = false;

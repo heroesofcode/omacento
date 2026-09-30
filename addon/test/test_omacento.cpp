@@ -99,7 +99,7 @@ int main() {
 
     const std::vector<std::string> wanted = {"a", "ã", "o", "e",  "Ã", "i", "u",
                                              "õ", "c", "e", "à",  "Ł", "á",
-                                             "ć"};
+                                             "ć", "A"};
 
     int failures = 0;
     instance.eventDispatcher().schedule([&instance, &failures]() {
@@ -265,6 +265,30 @@ int main() {
             c.setValueByPath("Table", "");
             c.setValueByPath("Language", "ptbr");
             addon->setConfig(c);
+        });
+
+        // Real keys from here on, with keycodes and the modifier state a
+        // frontend reports, because both cases are about what changes between
+        // a key going down and coming up.
+        const Key shiftA(FcitxKey_A, KeyState::Shift, 38);
+        const Key plainA(FcitxKey_a, KeyStates(), 38);
+        const Key shiftUp(FcitxKey_Shift_L, KeyState::Shift, 50);
+        auto raw = [frontend, ic](const Key &k, bool up) {
+            frontend->call<ITestFrontend::keyEvent>(ic, k, up);
+        };
+
+        // 15. Shift released before the letter, the ordinary way to type a
+        //     capital. The key goes down as "A" and comes up as "a", so it has
+        //     to be recognised by keycode, or the release is missed and the
+        //     popup opens on a key nobody is holding. And it is committed, not
+        //     forwarded: the Wayland frontend replays a forwarded key under the
+        //     modifiers held now, which would turn it into "a".
+        script->add(10, [=] { expect("A"); raw(shiftA, false); });
+        script->add(kWithin, [=] { raw(shiftUp, true); raw(plainA, true); });
+        script->add(kBeyond, [=] {
+            check(!popupOpen(), "no popup after a Shift-first release");
+            press("k");
+            release("k");
         });
 
         // 17. Focus leaving with the popup open closes it, and the letter it
