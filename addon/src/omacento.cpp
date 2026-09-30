@@ -42,6 +42,21 @@ Omacento::Omacento(fcitx::Instance *instance)
         fcitx::EventWatcherPhase::PreInputMethod, [this](fcitx::Event &event) {
             onKeyEvent(static_cast<fcitx::KeyEvent &>(event));
         });
+    // A focus change cancels whatever is held, with nothing committed and
+    // nothing forwarded. The field the letter was meant for is gone, and on
+    // Wayland a single input context serves every field, so anything sent now
+    // would land in the next one -- and a popup left open would hand its
+    // letter to the first key typed there.
+    focusOutHandler_ = instance_->watchEvent(
+        fcitx::EventType::InputContextFocusOut,
+        fcitx::EventWatcherPhase::Default, [this](fcitx::Event &event) {
+            auto *ic =
+                static_cast<fcitx::InputContextEvent &>(event).inputContext();
+            auto *state = ic->propertyFor(&factory_);
+            if (state->phase != Phase::Idle) {
+                reset(ic, state);
+            }
+        });
 }
 
 Omacento::~Omacento() = default;

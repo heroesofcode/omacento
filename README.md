@@ -34,6 +34,7 @@ context it runs a three-state machine:
 | picking | `Enter` / `Space` | commit the highlighted one |
 | picking | `Esc` / `Backspace` | commit the plain letter |
 | picking | release of the held key | nothing — the popup outlives the release, as on macOS |
+| pending or picking | focus leaves the field | drop it — nothing is committed, the popup closes |
 
 Three properties fall out of that design, and all three are the point:
 
@@ -274,6 +275,13 @@ turning into a bug report.
 **The blocklist matches the window class, not the process name.** fcitx5
 reports Brave as `brave-browser`, not `brave`. `omacento-apps` reads Hyprland's
 `initialClass` for exactly this reason.
+
+**On Wayland one input context serves every field.** The `wayland_v2` frontend
+keeps a single input context per seat, and a focus change is a deactivate and
+an activate on that same context. So whatever this addon was holding followed
+the focus: a popup still open when the field lost focus handed its letter to
+the first key typed in the next one. A focus change now cancels whatever is
+held.
 
 **Chromium drops `delete_surrounding_text` on Wayland.** Measured through the
 DevTools protocol: the call arrives and nothing happens, no error. Any design

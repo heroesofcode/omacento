@@ -21,6 +21,8 @@
 #include <fcitx-utils/testing.h>
 #include <fcitx/addoninstance.h>
 #include <fcitx/addonmanager.h>
+#include <fcitx/inputcontextmanager.h>
+#include <fcitx/inputpanel.h>
 #include <fcitx/instance.h>
 
 using namespace fcitx;
@@ -126,6 +128,18 @@ int main() {
         };
         auto expect = [frontend](const std::string &s) {
             frontend->call<ITestFrontend::pushCommitExpectation>(s);
+        };
+
+        auto *inputContext = instance.inputContextManager().findByUUID(ic);
+        // Whether the popup is up, read off the shared input panel.
+        auto popupOpen = [inputContext]() {
+            return inputContext->inputPanel().candidateList() != nullptr;
+        };
+        auto check = [&failures](bool ok, const char *what) {
+            if (!ok) {
+                FCITX_ERROR() << "check failed: " << what;
+                ++failures;
+            }
         };
 
         auto *script = new Script(&instance);
@@ -244,6 +258,44 @@ int main() {
         });
         script->add(kBeyond, [=] { press("1"); release("1"); });
         script->add(10, [=] { release("ccedilla"); });
+
+        // Back to the stock table for the rest.
+        script->add(10, [=] {
+            RawConfig c;
+            c.setValueByPath("Table", "");
+            c.setValueByPath("Language", "ptbr");
+            addon->setConfig(c);
+        });
+
+        // 17. Focus leaving with the popup open closes it, and the letter it
+        //     was holding does not turn up in whatever field comes next. On
+        //     Wayland every field shares one input context per seat, so state
+        //     that survives a focus change leaks into the next field.
+        script->add(10, [=] { press("a"); });
+        script->add(kBeyond, [=] {
+            check(popupOpen(), "popup open before the focus change");
+            inputContext->focusOut();
+            check(!popupOpen(), "popup closed by the focus change");
+            inputContext->focusIn();
+            press("b");
+            release("b");
+            release("a");
+        });
+
+        // 18. Focus leaving mid-tap cancels the key: the hold timer must not
+        //     go off afterwards and open a popup in a field it was never
+        //     meant for.
+        script->add(10, [=] { press("o"); });
+        script->add(kWithin, [=] {
+            inputContext->focusOut();
+            inputContext->focusIn();
+        });
+        script->add(kBeyond, [=] {
+            check(!popupOpen(), "no popup after focus left mid-tap");
+            release("o");
+            press("k");
+            release("k");
+        });
 
         script->run();
     });

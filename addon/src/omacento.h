@@ -96,6 +96,8 @@ private:
 
     fcitx::FactoryFor<OmacentoState> factory_;
     std::unique_ptr<fcitx::HandlerTableEntry<fcitx::EventHandler>> keyHandler_;
+    std::unique_ptr<fcitx::HandlerTableEntry<fcitx::EventHandler>>
+        focusOutHandler_;
 };
 
 class OmacentoFactory : public fcitx::AddonFactory {
