@@ -55,8 +55,8 @@ using Variants = std::vector<std::string>;
 class OmacentoState : public fcitx::InputContextProperty {
 public:
     Phase phase = Phase::Idle;
-    // The key as it went down. Matched by keycode, because the keysym can
-    // change before it comes back up.
+    // The key as it went down: keycode, keysym and modifiers. Kept whole
+    // because a tap is handed back to the application as this very key.
     fcitx::Key heldKey;
     std::string base;
     Variants variants;
@@ -85,6 +85,10 @@ private:
     void arm(fcitx::InputContext *ic, OmacentoState *state);
     void openPicker(fcitx::InputContext *ic, OmacentoState *state);
     void setPreedit(fcitx::InputContext *ic, const std::string &text);
+    // Hands a tap back to the application. True if it went back as the key
+    // itself, false if it had to be committed as text.
+    bool deliverTap(fcitx::InputContext *ic, OmacentoState *state,
+                    const fcitx::Key &now, int time);
     // By value on purpose: every caller passes a reference into the state that
     // reset() is about to clear.
     void commitAndReset(fcitx::InputContext *ic, OmacentoState *state,

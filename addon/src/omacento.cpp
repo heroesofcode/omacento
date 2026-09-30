@@ -34,6 +34,15 @@ bool sameKey(const fcitx::Key &held, const fcitx::Key &key) {
     return held.sym() == key.sym();
 }
 
+// Whether the modifiers that decide a letter's case are what they were when it
+// went down.
+bool sameCase(const fcitx::Key &held, const fcitx::Key &now) {
+    const fcitx::KeyStates caseStates =
+        fcitx::KeyStates(fcitx::KeyState::Shift) | fcitx::KeyState::CapsLock;
+    return (held.states() & caseStates).toInteger() ==
+           (now.states() & caseStates).toInteger();
+}
+
 fcitx::CommonCandidateList *candidates(fcitx::InputContext *ic) {
     return dynamic_cast<fcitx::CommonCandidateList *>(
         ic->inputPanel().candidateList().get());
@@ -196,6 +205,38 @@ void Omacento::commitAndReset(fcitx::InputContext *ic, OmacentoState *state,
     reset(ic, state);
 }
 
+bool Omacento::deliverTap(fcitx::InputContext *ic, OmacentoState *state,
+                          const fcitx::Key &now, int time) {
+    // A tap goes back to the application as the key itself, not as the letter
+    // it produces, which makes it indistinguishable from a key this addon does
+    // not handle at all. That matters wherever the keydown itself means
+    // something: a selected Google Sheets cell starts editing on a real
+    // keydown, and a committed string arrives without one and is dropped
+    // (issue #10).
+    //
+    // Only the press is forwarded; the release is the user's own and is let
+    // through behind it. The D-Bus and XIM frontends forward exactly what they
+    // are given, so filtering the real release would leave the key down in the
+    // client. The Wayland frontend adds a release to every forwarded press, so
+    // there the client gets one release too many -- a release for a key it
+    // never saw go down, which is what fcitx5 already sends after every key
+    // when PreferKeyEvent is off, so clients cope.
+    //
+    // The exception is a change of case between press and release. The Wayland
+    // frontend replays a forwarded key under the modifiers held now, not the
+    // ones it went down with, so let go of Shift before the letter and "A"
+    // would arrive as "a". Then the letter is committed as text, as every tap
+    // used to be.
+    if (sameCase(state->heldKey, now)) {
+        const fcitx::Key key = state->heldKey;
+        reset(ic, state);
+        ic->forwardKey(key, false, time);
+        return true;
+    }
+    commitAndReset(ic, state, state->base);
+    return false;
+}
+
 void Omacento::arm(fcitx::InputContext *ic, OmacentoState *state) {
     auto ref = ic->watch();
     state->timer = instance_->eventLoop().addTimeEvent(
@@ -301,9 +342,10 @@ void Omacento::onKeyEvent(fcitx::KeyEvent &event) {
         commitAndReset(ic, state, state->base);
     } else if (state->phase == Phase::Pending) {
         if (event.isRelease()) {
-            if (sameKey(state->heldKey, event.rawKey())) {
-                // A tap, not a hold.
-                commitAndReset(ic, state, state->base);
+            if (sameKey(state->heldKey, event.rawKey()) &&
+                !deliverTap(ic, state, event.rawKey(), event.time())) {
+                // A tap, committed as text: the application never saw the key
+                // go down, so it does not get to see it come up either.
                 event.filterAndAccept();
             }
             return;
@@ -313,7 +355,9 @@ void Omacento::onKeyEvent(fcitx::KeyEvent &event) {
             event.filterAndAccept();
             return;
         }
-        commitAndReset(ic, state, state->base);
+        // Another key before the release: the first one was a tap, and it has
+        // to reach the application ahead of this one.
+        deliverTap(ic, state, event.rawKey(), event.time());
     }
 
     if (event.isRelease() || !*config_.enabled) {
@@ -333,7 +377,7 @@ void Omacento::onKeyEvent(fcitx::KeyEvent &event) {
     state->base = fcitx::utf8::UCS4ToUTF8(cp);
     state->variants = *variants;
     // Deliberately no preedit here. A tap is by far the common case and must
-    // look like a plain keystroke to the application: one commit, no
+    // look like a plain keystroke to the application: the key itself, no
     // composition. openPicker() starts the composition if the hold survives.
     arm(ic, state);
     event.filterAndAccept();

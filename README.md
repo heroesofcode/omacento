@@ -26,8 +26,8 @@ context it runs a three-state machine:
 | State | Event | What happens |
 |---|---|---|
 | idle | press of an accent-bearing key | consume it and start a timer — nothing is shown yet |
-| pending | release before the timer | commit the plain letter — it was a tap |
-| pending | a different key | commit the plain letter, then handle the new key normally |
+| pending | release before the timer | hand the key back to the application — it was a tap |
+| pending | a different key | hand the first key back, then handle the new one normally |
 | pending | timer fires | put the base letter in the **preedit** and show the candidates |
 | picking | `1`–`9` | commit that accent |
 | picking | `←` `→` `Tab` | move the selection |
@@ -49,14 +49,23 @@ it lives in the preedit. So nothing ever has to be deleted afterwards, and
 called. That is why accents work in Brave on native Wayland here, with no
 XWayland, no wrapper script and no browser flags.
 
-**Ordinary typing produces no composition at all.** A tap is one
-`commit_string` and nothing else; the preedit only starts if the hold survives
-the timer. An earlier version opened a composition on every keypress and
-withdrew it on release, which is invisible in a terminal but made Google Docs
-walk its caret backwards and scramble letters — it re-renders on every
-composition cycle. Measured in a `contenteditable`: typing a sentence now fires
-zero `compositionstart` and zero `delete*` input events, and a single held key
-fires exactly one.
+**Ordinary typing is ordinary typing.** A tap is handed back to the
+application as the key itself, so to the application it is indistinguishable
+from a key this addon does not handle; the preedit only starts if the hold
+survives the timer. Two earlier versions got this wrong in different ways.
+
+The first opened a composition on every keypress and withdrew it on release,
+which is invisible in a terminal but made Google Docs walk its caret backwards
+and scramble letters — it re-renders on every composition cycle. Measured in a
+`contenteditable` once that was fixed: typing a sentence fires zero
+`compositionstart` and zero `delete*` input events, and a single held key fires
+exactly one.
+
+The second committed each tap as text. That is invisible almost everywhere, and
+wrong exactly where the keydown itself means something: a selected Google
+Sheets cell starts editing on a real keydown, and a commit arrives without one,
+so the first vowel typed into a cell vanished
+([#10](https://github.com/heroesofcode/omacento/issues/10)).
 
 Because it lives inside fcitx5, it inherits every frontend fcitx5 already has:
 Wayland (`text-input-v3`), XIM, GTK, Qt and D-Bus. Verified working in GTK4 on
@@ -205,15 +214,21 @@ make -C addon test
 
 This loads the freshly built `libomacento.so` into a real fcitx5 `Instance`
 alongside fcitx5's own `TestFrontend`, sends key events, and checks what comes
-back out. Ten cases: tap, hold-and-pick, arrow-and-Enter, `Esc`, flush by a
-second key, the uppercase table, `Ctrl+A` staying untouched, the blocklist, a
-digit past the end of the list, and the off switch.
+back out. Eighteen cases: tap, hold-and-pick, `Esc`, flush by a second key, the
+uppercase table, `Ctrl+A` staying untouched, the blocklist, arrow-and-Enter, a
+digit past the end of the list, the off switch, four about languages and custom
+tables, and four about what can change between a key going down and coming up
+— Shift let go first, Shift held throughout, and focus leaving with the popup
+open or in the middle of a tap.
 
 Two independent checks run at once. `pushCommitExpectation` aborts at the exact
 commit that goes wrong, which is where the useful stack trace is; and the test
-records every commit itself and compares the whole sequence at the end, because
-the first check cannot see a commit that never happens — an addon that committed
-nothing would otherwise pass with every expectation still queued.
+records every commit and every forwarded key itself, in one sequence, and
+compares the whole of it at the end, because the first check cannot see a
+commit that never happens — an addon that committed nothing would otherwise
+pass with every expectation still queued. A tap shows up in that sequence as
+`[a]`, the key, not `a`, the letter; a test expecting the letter is testing the
+bug from #10.
 
 The waits are against the addon's real timer, so the margins are deliberately
 wide (a 20 ms tap against a 300 ms hold). An earlier 3x margin failed about one
@@ -275,6 +290,32 @@ turning into a bug report.
 **The blocklist matches the window class, not the process name.** fcitx5
 reports Brave as `brave-browser`, not `brave`. `omacento-apps` reads Hyprland's
 `initialClass` for exactly this reason.
+
+**A committed string is not a keystroke.** To most text fields the two are
+indistinguishable, which is why committing a tap looked fine for as long as it
+did. Google Sheets is where they part: a selected cell has no visible text
+field, starts editing on a real keydown, and treats a commit that arrives
+without one as nothing — the letter vanished and the cell stopped responding
+until another was selected. Taps now go back through `forwardKey`, which on
+Wayland travels exactly the path of a key this addon never touched: fcitx5
+sends every key it does not filter through the same virtual keyboard.
+
+**A forwarded key on Wayland takes the modifiers held now.** fcitx5's
+`wayland_v2` frontend replays a forwarded key through its virtual keyboard,
+whose modifier state follows the physical keys; the modifiers inside the
+forwarded key are ignored. The D-Bus and XIM frontends use them. So a capital
+typed the ordinary way, Shift let go a moment before the letter, would be
+forwarded as lowercase. When the case has changed between press and release,
+the tap is committed as text instead — the old behaviour, correct letter, and
+the Sheets bug back for that one keystroke only.
+
+**Forwarding a press on Wayland releases it too.** The `wayland_v2` frontend
+follows every forwarded press with a release of its own; D-Bus and XIM forward
+exactly the one event they are given. So only the press is forwarded and the
+real release is let through behind it, which is right on D-Bus and XIM and
+leaves Wayland clients with one release too many — a release for a key they
+never saw go down, which fcitx5 already sends after every key whenever
+`PreferKeyEvent` is off.
 
 **The keysym is not stable across a press.** Let go of Shift before the letter
 and a key that went down as `A` comes back up as `a`. Matching the release by
