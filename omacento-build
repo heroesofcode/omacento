@@ -2,7 +2,8 @@
 #
 # Build and install the fcitx5 addon into the user's own directories.
 #
-#   omacento-build           build only if missing or built against another fcitx5
+#   omacento-build           build only if missing, built against another fcitx5,
+#                            or built from other source than this checkout's
 #   omacento-build --force   build regardless
 #   omacento-build --check   report status, write nothing, exit 1 if a build is due
 #
@@ -14,6 +15,11 @@
 # silently stops the popup from loading. This script is wired into
 # omarchy-fcitx5.service as ExecStartPre, so the rebuild happens on the next
 # start after an upgrade rather than on the next time the user notices.
+#
+# The source counts too. A plugin update pulls new C++ and leaves the installed
+# .so exactly where it was, and "is there one, built for this fcitx5?" says
+# yes -- so an update used to be pulled, reported as current, and never
+# compiled. The hash of the source a build came from is kept next to it.
 
 set -uo pipefail
 
@@ -22,6 +28,8 @@ ADDON="$HERE/addon"
 PREFIX="${OMACENTO_PREFIX:-$HOME/.local}"
 SO="$PREFIX/lib/fcitx5/libomacento.so"
 CONF="$PREFIX/share/fcitx5/addon/omacento.conf"
+# fcitx5 only reads *.conf from that directory, so this sits there unnoticed.
+STAMP="$PREFIX/share/fcitx5/addon/omacento.source"
 
 MODE="${1:-}"
 
@@ -29,9 +37,16 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 want_version() { pkg-config --modversion Fcitx5Core 2>/dev/null; }
 have_version() { [ -f "$CONF" ] && sed -n 's/^Version=//p' "$CONF" | head -1; }
+# Everything the .so is made from, by content and name, never by mtime: a git
+# checkout does not preserve mtimes, and an update is a checkout.
+source_hash() {
+  (cd "$ADDON" && LC_ALL=C sha256sum Makefile omacento.conf.in src/*) |
+    sha256sum | cut -d' ' -f1
+}
 
 WANT="$(want_version)"
 GOT="$(have_version)"
+SOURCE="$(source_hash)"
 
 if [ -z "$WANT" ]; then
   echo "omacento-build: fcitx5 development files not found (pkg-config Fcitx5Core)" >&2
@@ -41,12 +56,18 @@ fi
 status="ok"
 [ -f "$SO" ] || status="missing"
 [ "$GOT" = "$WANT" ] || status="stale"
+# No record at all means a build from before this check existed, which is every
+# install of 1.1.0 and earlier: rebuild it once.
+if [ "$status" = "ok" ] && [ "$(cat "$STAMP" 2>/dev/null)" != "$SOURCE" ]; then
+  status="changed"
+fi
 
 if [ "$MODE" = "--check" ]; then
   case "$status" in
     ok)      echo "omacento-build: up to date (fcitx5 $WANT)"; exit 0 ;;
     missing) echo "omacento-build: addon not installed"; exit 1 ;;
     stale)   echo "omacento-build: built for fcitx5 ${GOT:-unknown}, running $WANT"; exit 1 ;;
+    changed) echo "omacento-build: installed addon was built from other source"; exit 1 ;;
   esac
 fi
 
@@ -69,5 +90,6 @@ if ! make -C "$ADDON" PREFIX="$PREFIX" install >/dev/null; then
   echo "omacento-build: install failed" >&2
   exit 1
 fi
+printf '%s\n' "$SOURCE" > "$STAMP"
 echo "omacento-build: installed $SO"
 exit 10

@@ -145,8 +145,10 @@ copy to go stale.
 Note `omarchy-restart-shell`, not `omarchy-refresh-shell`: the latter resets
 `shell.json` to Omarchy's defaults and takes every plugin off your bar.
 
-The addon half looks after itself — `omacento-apply` restarts fcitx5 when it
-installs a new build, so only the panel needs the shell restart.
+The addon half looks after itself. `omacento-build` recompiles whenever the
+addon's source differs from the source the installed build came from, the panel
+runs it when it loads after that restart, and `omacento-apply` restarts fcitx5
+when a new build goes in — so the shell restart is the only step.
 
 ## It is not an input method
 
@@ -200,6 +202,7 @@ panel and the CLI cannot disagree.
 | `~/.local/share/fcitx5/themes/omacento/` | the generated theme |
 | `~/.local/lib/fcitx5/libomacento.so` | the compiled addon |
 | `~/.local/share/fcitx5/addon/omacento.conf` | addon metadata |
+| `~/.local/share/fcitx5/addon/omacento.source` | which source that build came from |
 | `~/.local/state/omacento/appearance.json` | so the theme hooks can run alone |
 | `~/.config/omarchy/hooks/{theme-set,font-set}.d/50-omacento` | theme sync |
 | `~/.config/systemd/user/omarchy-fcitx5.service.d/10-omacento-addon.conf` | addon search path and rebuild |
@@ -229,6 +232,15 @@ commit that never happens — an addon that committed nothing would otherwise
 pass with every expectation still queued. A tap shows up in that sequence as
 `[a]`, the key, not `a`, the letter; a test expecting the letter is testing the
 bug from #10.
+
+```bash
+test/omacento-build.sh
+```
+
+checks the other half: that a change to the addon's source is compiled on the
+next run, and that a build with no record of its source is rebuilt. It works on
+a copy of the plugin in a temporary directory with `OMACENTO_PREFIX` pointed
+into it, so nothing under `~/.local` is touched. Both run on every pull request.
 
 The waits are against the addon's real timer, so the margins are deliberately
 wide (a 20 ms tap against a 300 ms hold). An earlier 3x margin failed about one
@@ -286,6 +298,16 @@ drop-in.
 user's point of view. `omacento-build` runs as `ExecStartPre` of
 `omarchy-fcitx5.service`, so an upgrade heals on the next start instead of
 turning into a bug report.
+
+**An update used to compile nothing.** `omarchy plugin update` pulls new C++
+and leaves the installed `.so` exactly where it was, and the old check — is
+there a build, and was it made for this fcitx5? — said yes. So an update that
+changed the addon was pulled, reported as current by `omacento-doctor` too, and
+never compiled: the fix for
+[#10](https://github.com/heroesofcode/omacento/issues/10) would have reached
+nobody who already had the plugin. The hash of the source a build came from now
+sits next to it in `omacento.source`, and a build with no record at all is
+rebuilt once.
 
 **The blocklist matches the window class, not the process name.** fcitx5
 reports Brave as `brave-browser`, not `brave`. `omacento-apps` reads Hyprland's

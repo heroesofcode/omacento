@@ -28,3 +28,6 @@ jobs:
 
       - name: Run the test suite
         run: make -C addon test
+
+      - name: Check that an update's source gets compiled
+        run: bash test/omacento-build.sh

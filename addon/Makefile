@@ -35,7 +35,7 @@ install: all
 	@echo "installed into $(LIBDIR) and $(CONFDIR) (built against fcitx5 $(FCITX_VERSION))"
 
 uninstall:
-	@rm -f $(LIBDIR)/libomacento.so $(CONFDIR)/omacento.conf
+	@rm -f $(LIBDIR)/libomacento.so $(CONFDIR)/omacento.conf $(CONFDIR)/omacento.source
 	@echo "removed libomacento.so and omacento.conf"
 
 # Runs the addon inside a real fcitx5 Instance with fcitx5's own TestFrontend.

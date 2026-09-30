@@ -54,6 +54,15 @@ if [ -n "$WANT" ] && [ "$GOT" = "$WANT" ]; then
 elif [ -n "$GOT" ]; then
   bad "built for fcitx5 $GOT but $WANT is running — fcitx5 will refuse it. Run: $HERE/omacento-build --force"
 fi
+# A build for the right fcitx5 can still be an old build: an update pulls new
+# source and compiles nothing until omacento-build notices.
+if [ -f "$SO" ] && [ -n "$WANT" ] && [ "$GOT" = "$WANT" ]; then
+  if "$HERE/omacento-build" --check >/dev/null 2>&1; then
+    ok "built from this copy of the source"
+  else
+    bad "built from older source than this plugin has — an update was never compiled. Run: $HERE/omacento-build"
+  fi
+fi
 
 # fcitx5 only searches /usr/lib/fcitx5 by default, and FCITX_ADDON_DIRS replaces
 # that list rather than extending it.
