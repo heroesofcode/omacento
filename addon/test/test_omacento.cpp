@@ -2,13 +2,17 @@
 //
 // These drive a real fcitx5 Instance with the freshly built libomacento.so and
 // fcitx5's own TestFrontend, so what is exercised is the addon as fcitx5 loads
-// it — key events in, commits out — rather than a reimplementation of its
-// logic in the test.
+// it — key events in, commits and forwarded keys out — rather than a
+// reimplementation of its logic in the test.
 //
 // TestFrontend::pushCommitExpectation queues the commits a step must produce,
 // in order, and aborts on a mismatch. That is what makes "the base letter must
 // not be committed before the accent" testable at all: a stray commit fails
 // against the next expectation instead of passing unnoticed.
+//
+// A tap is not a commit. It goes back to the application as the key itself, so
+// it shows up in the recorded output as "[a]" rather than "a" -- and a test
+// that expects a commit for a tap is testing the bug from issue #10.
 
 #include <functional>
 #include <string>
@@ -90,16 +94,26 @@ int main() {
     // happens, though, so record them independently and check the whole
     // sequence at the end -- otherwise an addon that commits nothing at all
     // would sail through every expectation still queued.
-    std::vector<std::string> commits;
+    //
+    // Forwarded keys go into the same sequence, bracketed, so the order of a
+    // forward against a commit is checked too.
+    std::vector<std::string> output;
     auto commitWatcher = instance.watchEvent(
         EventType::InputContextCommitString, EventWatcherPhase::Default,
-        [&commits](Event &event) {
-            commits.push_back(static_cast<CommitStringEvent &>(event).text());
+        [&output](Event &event) {
+            output.push_back(static_cast<CommitStringEvent &>(event).text());
+        });
+    auto forwardWatcher = instance.watchEvent(
+        EventType::InputContextForwardKey, EventWatcherPhase::Default,
+        [&output](Event &event) {
+            auto &fwd = static_cast<ForwardKeyEvent &>(event);
+            output.push_back("[" + fwd.rawKey().toString() +
+                             (fwd.isRelease() ? " up" : "") + "]");
         });
 
-    const std::vector<std::string> wanted = {"a", "ã", "o", "e",  "Ã", "i", "u",
-                                             "õ", "c", "e", "à",  "Ł", "á",
-                                             "ć", "A"};
+    const std::vector<std::string> wanted = {
+        "[a]", "ã", "o", "[e]", "Ã", "[i]", "[u]", "õ", "c", "[e]",
+        "à",   "Ł", "á", "ć",   "A", "[Shift+A]"};
 
     int failures = 0;
     instance.eventDispatcher().schedule([&instance, &failures]() {
@@ -144,10 +158,18 @@ int main() {
 
         auto *script = new Script(&instance);
 
-        // 1. A tap commits the plain letter. This is the regression that once
-        //    committed an empty string and made vowels untypable.
-        script->add(0, [=] { expect("a"); press("a"); });
-        script->add(kWithin, [=] { release("a"); });
+        // 1. A tap hands the key itself back to the application -- not the
+        //    letter it produces. Sheets starts editing a selected cell on a
+        //    real keydown and drops a bare commit (issue #10). The release is
+        //    let through behind it: the D-Bus and XIM frontends forward
+        //    exactly one event per call, so filtering it would leave the key
+        //    down in the client.
+        script->add(0, [=] { press("a"); });
+        script->add(kWithin, [=] {
+            const bool filtered =
+                frontend->call<ITestFrontend::sendKeyEvent>(ic, Key("a"), true);
+            check(!filtered, "the release of a tap reaches the application");
+        });
 
         // 2. A hold opens the popup; a digit commits that accent and the base
         //    letter is never committed on its own.
@@ -160,8 +182,9 @@ int main() {
         script->add(kBeyond, [=] { press("Escape"); release("Escape"); });
         script->add(10, [=] { release("o"); });
 
-        // 4. A second key while waiting flushes the first letter.
-        script->add(10, [=] { expect("e"); press("e"); });
+        // 4. A second key while waiting flushes the first letter, as a key --
+        //    otherwise fast typing brings the bug back, one rollover at a time.
+        script->add(10, [=] { press("e"); });
         script->add(kWithin, [=] { press("k"); release("k"); release("e"); });
 
         // 5. Shift reaches the uppercase table.
@@ -172,7 +195,7 @@ int main() {
         // 6. Modified keys belong to the application. If this ever regresses,
         //    Ctrl+A stops selecting all, everywhere.
         script->add(10, [=] { press("Control+a"); release("Control+a"); });
-        script->add(10, [=] { expect("i"); press("i"); });
+        script->add(10, [=] { press("i"); });
         script->add(kWithin, [=] { release("i"); });
 
         // 7. A blocklisted program gets its key back untouched, popup or not.
@@ -187,7 +210,6 @@ int main() {
             RawConfig unblocked;
             unblocked.setValueByPath("Blocklist", "");
             addon->setConfig(unblocked);
-            expect("u");
             press("u");
         });
         script->add(kWithin, [=] { release("u"); });
@@ -216,7 +238,6 @@ int main() {
             RawConfig on;
             on.setValueByPath("Enabled", "True");
             addon->setConfig(on);
-            expect("e");
             press("e");
         });
         script->add(kWithin, [=] { release("e"); });
@@ -291,6 +312,11 @@ int main() {
             release("k");
         });
 
+        // 16. With Shift still down at the release, the key is forwarded as it
+        //     went down, capital and all.
+        script->add(10, [=] { raw(shiftA, false); });
+        script->add(kWithin, [=] { raw(shiftA, true); });
+
         // 17. Focus leaving with the popup open closes it, and the letter it
         //     was holding does not turn up in whatever field comes next. On
         //     Wayland every field shares one input context per seat, so state
@@ -326,16 +352,16 @@ int main() {
 
     instance.exec();
 
-    if (commits != wanted) {
-        FCITX_ERROR() << "commit sequence mismatch";
+    if (output != wanted) {
+        FCITX_ERROR() << "output sequence mismatch";
         FCITX_ERROR() << "  wanted: " << wanted;
-        FCITX_ERROR() << "  got:    " << commits;
+        FCITX_ERROR() << "  got:    " << output;
         ++failures;
     }
     if (failures) {
         FCITX_ERROR() << failures << " failure(s)";
         return 1;
     }
-    FCITX_INFO() << commits.size() << " commits, all as expected";
+    FCITX_INFO() << output.size() << " outputs, all as expected";
     return 0;
 }
